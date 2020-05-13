@@ -61,7 +61,7 @@ class k_PreDungeon(Keyboard):
     """Меню выбора героев для похода"""
     board = create_keyboard([['. 1', 1, 0], ['. 2', 1, 0], ['. 3', 1, 0],
                              ['Отправиться', 2, 1], ['Отменить', 3, 0]])
-    commands = {'отменить': sv.f_goto_menu, '.': sv.f_chose_pos}
+    commands = {'отменить': sv.f_goto_menu, '.': sv.f_chose_pos, 'отправиться': ''}
 
 
 class k_Inventory(Keyboard):
@@ -113,8 +113,13 @@ class k_CharacterMenu(Keyboard):
     commands = {'.': sv.f_character, 'меню': sv.f_goto_menu}
 
 
-class k_PreDungeonCharactersSelect(k_CharacterMenu):
+class k_WeaponSelect(Keyboard):
     pass
+
+
+class k_PreDungeonCharactersSelect(k_CharacterMenu):
+    commands = {'.': sv.f_dungeon_character}
+
 
 class k_Character(Keyboard):
     board = create_keyboard([['Улучшить', 1, 0],
@@ -138,6 +143,8 @@ KEYBOARDS = {
     8: k_CharacterMenu,
     9: k_Character,
     10: k_UpgradeCharacter,
+    11: k_PreDungeonCharactersSelect,
+    12: k_WeaponSelect,
 
     4: k_Inventory,
 

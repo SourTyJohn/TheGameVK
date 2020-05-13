@@ -111,6 +111,18 @@ def f_chose_weapon(*args):
 
     except Exception:
         return 'что-то не так'
+
+
+def f_dungeon_character(user, session, text):
+    user.selected_slot_2 = user.selected_slot
+    get_id_character(user, text)
+    user.set_keyboard(12, session)
+    return 'Выберите оружие для этого персонажа'
+
+
+def f_goto_dungeon(*args):
+    pass
+
 # == ==
 
 
