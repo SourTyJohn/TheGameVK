@@ -7,12 +7,19 @@ HEALTH_PER_AGL = 2
 BASIC_STAMINA = 100
 STAMINA_PER_STM = 4
 STATS = ['str', 'dex', 'rea', 'stm', 'agl', 'int', 'lck', 'att']
+STATS_NAMES = {'str': 'Сила', 'dex': 'Ловкость', 'rea': 'Реакция', 'stm': 'Выносливость',
+               'agl': 'Здоровье', 'int': 'Интеллект', 'lck': 'Удача', 'att': 'Внимательность'}
+
+RND_NAMES = ['Люси', 'Гарольд', 'Ричард', 'Абдул Альхазред', 'Чарльз Вард', 'Геральт',
+             "Жанна Л'айт", 'Серёга', 'Гатс', 'Джудо', 'Рихард']
 
 
 class PassiveCharacter:
     name = sql.Column(sql.String, nullable=False)
 
     lvl = sql.Column(sql.Integer)
+    exp = sql.Column(sql.Integer, default=0)
+
     #  Все параметры героя. Начинаются с s_
     s_free = sql.Column(sql.Integer)
     s_free_perks = sql.Column(sql.Integer)
@@ -49,13 +56,15 @@ class ActiveCharacter:
     s_lck_add = sql.Column(sql.Integer, default=0)
     s_att_add = sql.Column(sql.Integer, default=0)
 
-    health_now = sql.Column(sql.Integer, nullable=False)
-    health_max = sql.Column(sql.Integer, nullable=False)
-    stamina_now = sql.Column(sql.Integer, nullable=False)
-    stamina_max = sql.Column(sql.Integer, nullable=False)
+    health_now = sql.Column(sql.Integer)
+    health_max = sql.Column(sql.Integer)
+    stamina_now = sql.Column(sql.Integer)
+    stamina_max = sql.Column(sql.Integer)
 
     """Вызывать в __init__  Устанавливает начальное здоровье равное максимуму"""
     def start(self):
+        self.s_agl_add = 0
+        self.s_stm_add = 0
         self.recalculate_params()
         self.health_now, self.stamina_now = self.health_max, self.stamina_max
 
@@ -63,7 +72,7 @@ class ActiveCharacter:
         Вызывать при перемене параметров"""
     def recalculate_params(self):
         self.health_max = BASIC_HEALTH + int(HEALTH_PER_AGL * (self.s_agl_add + self.passive.s_agl_base))
-        self.health_max = BASIC_STAMINA + int(STAMINA_PER_STM * (self.s_stm_add + self.passive.s_stm_base))
+        self.stamina_max = BASIC_STAMINA + int(STAMINA_PER_STM * (self.s_stm_add + self.passive.s_stm_base))
 
     # Восстановление и урон. Последний этап
     def health_regenerate(self, amount):

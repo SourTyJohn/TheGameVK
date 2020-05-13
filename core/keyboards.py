@@ -10,7 +10,7 @@ B_COLORS = [
 ]
 
 BUTTON_MENU = ['Меню', 2, 1]
-BUTTON_HELP = ['Помощь', 0, 1]
+BUTTON_HELP = ['Справка', 0, 1]
 BUTTON_BACK = ['Назад', 2, 1]
 
 
@@ -44,7 +44,7 @@ class k_MainMenu(Keyboard):
                              ['Торговая_площадка', 1, True],
                              ['Арена', 3, True]])
     commands = {'подземелье': sv.f_prepare, 'инвентарь': sv.f_inventory_main,
-                'торговая_площадка': sv.f_marketplace}
+                'торговая_площадка': sv.f_marketplace, 'персонажи': sv.f_characters_main}
 
 
 class k_YesNoClose(Keyboard):
@@ -57,21 +57,11 @@ class k_YesNoClose(Keyboard):
         return command in cls.commands.keys()
 
 
-class K_PreDungeon(Keyboard):
+class k_PreDungeon(Keyboard):
     """Меню выбора героев для похода"""
-    board = create_keyboard([['1', 1, 0], ['2', 1, 0], ['3', 1, 0]], inline=True)
-    commands = {'1': None}
-
-
-class k_CharacterSelect(Keyboard):
-    board = create_keyboard([['1. Осмотреть', 1, 0], ['1. Выбрать', 1, 0],
-                             ['2. Осмотреть', 1, 1], ['2. Выбрать', 1, 0],
-                             ['3. Осмотреть', 1, 1], ['3. Выбрать', 1, 0],
-                             ['4. Осмотреть', 1, 1], ['4. Выбрать', 1, 0],
-                             ['5. Осмотреть', 1, 1], ['5. Выбрать', 1, 0]])
-    commands = {}
-    for x in range(1, 6):
-        pass
+    board = create_keyboard([['. 1', 1, 0], ['. 2', 1, 0], ['. 3', 1, 0],
+                             ['Отправиться', 2, 1], ['Отменить', 3, 0]])
+    commands = {'отменить': sv.f_goto_menu, '.': sv.f_chose_pos}
 
 
 class k_Inventory(Keyboard):
@@ -79,9 +69,9 @@ class k_Inventory(Keyboard):
                              BUTTON_HELP,
                              BUTTON_MENU])
     commands = {'обновить': sv.f_inventory_main, 'меню': sv.f_goto_menu,
-                'о': sv.f_show_item_good, 'o': sv.f_show_item_good,
+                'о': sv.f_show_item_good, 'и': sv.f_use_from_inv,
                 'п': sv.f_sell, 'к': sv.f_buy,
-                'помощь': sv.f_inventory_help}
+                'справка': sv.f_inventory_help}
 
 
 class k_Marketplace(Keyboard):
@@ -93,7 +83,7 @@ class k_Marketplace(Keyboard):
     commands = {'обновить': sv.f_marketplace, 'меню': sv.f_goto_menu,
                 '<--': sv.f_prev_page, '-->': sv.f_next_page,
                 'п': sv.f_sell, 'к': sv.f_buy,
-                'помощь': sv.f_market_help,
+                'справка': sv.f_market_help,
                 'н': sv.f_find_in_market, 'мои_лоты': sv.f_show_my_lots}
 
 
@@ -112,14 +102,45 @@ class k_MyLots(Keyboard):
     board = create_keyboard([['Обновить', 1, 0],
                              BUTTON_HELP,
                              BUTTON_BACK])
-    commands = {'назад': sv.f_marketplace, 'помощь': sv.f_my_lots_help, 'у': sv.f_delete_lot,
+    commands = {'назад': sv.f_marketplace, 'справка': sv.f_my_lots_help, 'у': sv.f_delete_lot,
                 'обновить': sv.f_show_my_lots}
+
+
+class k_CharacterMenu(Keyboard):
+    board = create_keyboard([['. 1', 1, 0], ['. 2', 1, 0], ['. 3', 1, 0],
+                             ['. 4', 1, 1], ['. 5', 1, 0], ['. 6', 1, 0],
+                             BUTTON_MENU])
+    commands = {'.': sv.f_character, 'меню': sv.f_goto_menu}
+
+
+class k_PreDungeonCharactersSelect(k_CharacterMenu):
+    pass
+
+class k_Character(Keyboard):
+    board = create_keyboard([['Улучшить', 1, 0],
+                             ['Справка', 1, 0],
+                             BUTTON_BACK])
+    commands = {'улучшить': sv.f_character_upgrade_main, 'назад': sv.f_characters_main,
+                'справка': sv.f_character_help, 'выгнать': sv.f_character_delete}
+
+
+class k_UpgradeCharacter(Keyboard):
+    board = create_keyboard([['+ str', 1, 0], ['+ dex', 1, 0], ['+ rea', 1, 1], ['+ stm', 1, 0],
+                             ['+ agl', 1, 1], ['+ int', 1, 0], ['+ lck', 1, 1], ['+ att', 1, 0],
+                             BUTTON_BACK])
+    commands = {'назад': sv.f_characters_main, '+': sv.f_character_upgrade}
 
 
 KEYBOARDS = {
     2: k_MainMenu,
-    3: k_CharacterSelect,
+    3: k_PreDungeon,
+
+    8: k_CharacterMenu,
+    9: k_Character,
+    10: k_UpgradeCharacter,
+
     4: k_Inventory,
+
     5: k_Marketplace,
     6: k_MyLots,
     7: k_MarketplaceSearch

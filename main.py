@@ -1,4 +1,5 @@
 import random as rd
+from vk_api.bot_longpoll import VkBotEventType
 
 from core.keyboards import KEYBOARDS
 from core import server
@@ -21,7 +22,7 @@ def main():
 
 
 def event_do(event, vk):
-    if event.type == server.VkBotEventType.MESSAGE_NEW:
+    if event.type == VkBotEventType.MESSAGE_NEW:
         user_id = event.obj.message['from_id']
         text = event.message['text'].lower().split()
 
@@ -38,8 +39,7 @@ def event_do(event, vk):
                     send_message(user_id, vk, msg, btn)
 
         else:
-            server.f_start(user_id, session, None)
-            send_message(user_id, vk, 'Вы были успешно зарегестрированы', 2)
+            send_message(user_id, vk, server.f_start(user_id, session, None), 2)
 
         session.commit()
         session.close()

@@ -5,95 +5,116 @@ from ast import literal_eval
 from data.db_models._marketLot import LotSell, LotBuy, COMMISSION, COMMISSION_TEXT
 
 from core import server
+from sqlalchemy.orm import relation
+
+
+MAX_HEROES = 6
 
 
 class User(SqlAlchemyBase):
     __tablename__ = 'users'
-
     vk_id = sql.Column(sql.Integer, primary_key=True, autoincrement=True)
 
-    hero_1 = sql.Column(sql.Integer, sql.ForeignKey('a_heroes.id'), nullable=True)
-    hero_2 = sql.Column(sql.Integer, sql.ForeignKey('a_heroes.id'), nullable=True)
-    hero_3 = sql.Column(sql.Integer, sql.ForeignKey('a_heroes.id'), nullable=True)
+    """Активные герои игрока"""
+    hero1 = sql.Column(sql.Integer, sql.ForeignKey('a_heroes.id'), nullable=True)
+    hero2 = sql.Column(sql.Integer, sql.ForeignKey('a_heroes.id'), nullable=True)
+    hero3 = sql.Column(sql.Integer, sql.ForeignKey('a_heroes.id'), nullable=True)
 
-    idle_heroes = sql.Column(sql.String, nullable=True)  # {passiveHero.id};{passiveHero.id};...
+    h1 = relation("ActiveHero", foreign_keys=[hero1])
+    h2 = relation("ActiveHero", foreign_keys=[hero2])
+    h3 = relation("ActiveHero", foreign_keys=[hero3])
+
+    idle_hero1 = sql.Column(sql.Integer, sql.ForeignKey('p_heroes.id'), nullable=True)
+    idle_hero2 = sql.Column(sql.Integer, sql.ForeignKey('p_heroes.id'), nullable=True)
+    idle_hero3 = sql.Column(sql.Integer, sql.ForeignKey('p_heroes.id'), nullable=True)
+    idle_hero4 = sql.Column(sql.Integer, sql.ForeignKey('p_heroes.id'), nullable=True)
+    idle_hero5 = sql.Column(sql.Integer, sql.ForeignKey('p_heroes.id'), nullable=True)
+    idle_hero6 = sql.Column(sql.Integer, sql.ForeignKey('p_heroes.id'), nullable=True)
+
+    ih1 = relation("PassiveHero", foreign_keys=[idle_hero1])
+    ih2 = relation("PassiveHero", foreign_keys=[idle_hero2])
+    ih3 = relation("PassiveHero", foreign_keys=[idle_hero3])
+    ih4 = relation("PassiveHero", foreign_keys=[idle_hero4])
+    ih5 = relation("PassiveHero", foreign_keys=[idle_hero5])
+    ih6 = relation("PassiveHero", foreign_keys=[idle_hero6])
+
     good_inventory = sql.Column(sql.String, default='{}')  # dict {"item_id": count}
-    temp_inventory = sql.Column(sql.String, default='{}')
-    """temp_inventory - походный инвентарь. 
-       Если Ваша кампания провалится, то Вы потеряете весь этот инвентарь
-       good_inventory - инвентарь к которому нет доступа в походе,
-       но он не теряется при провале """
-
     money = sql.Column(sql.Integer, default=1000)
 
+    """Сражение в котором участвует игрок"""
     battle = sql.Column(sql.Integer, sql.ForeignKey('battles.id'), nullable=True)
-    """ID сражения в котором участвует игрок"""
+    b = relation("Battle")
 
     keyboard = sql.Column(sql.SmallInteger, default=1)
-    prev_keyboard = sql.Column(sql.Integer, default=1)
     page = sql.Column(sql.Integer, default=0)
-
     search = sql.Column(sql.String, nullable=True)
-    sorting = sql.Column(sql.SmallInteger, default=0)
 
     selected_slot = sql.Column(sql.Integer, nullable=True)
+    selected_slot_2 = sql.Column(sql.Integer, nullable=True)
 
     def __init__(self, vk_id):
         self.vk_id = vk_id
-        self.hero_1, self.hero_2, self.hero_3 = None, None, None
         self.keyboard = 2
-        self.idle_heroes = None
+
+    def new_hero(self, session, hero_id):
+        idle_heroes = self.get_heroes_list()
+        i = len(idle_heroes)
+        if i < MAX_HEROES:
+            if i == 0:
+                self.idle_hero1 = hero_id
+            elif i == 1:
+                self.idle_hero2 = hero_id
+            elif i == 2:
+                self.idle_hero3 = hero_id
+            elif i == 3:
+                self.idle_hero4 = hero_id
+            elif i == 4:
+                self.idle_hero5 = hero_id
+            elif i == 5:
+                self.idle_hero6 = hero_id
+            session.commit()
+            return True
+        return False
+
+    def del_hero(self, session, hero, k):
+        pass
+
+    def activate_hero(self, hero, slot, session):
+        active = hero.active(session)
+        session.add(active)
+        session.commit()
+        if slot == 1:
+            self.hero1 = active.id
+        elif slot == 2:
+            self.hero2 = active.id
+        elif slot == 3:
+            self.hero3 = active.id
+        session.commit()
+
+    def get_heroes_list(self) -> list:
+        return [x for x in [self.ih1, self.ih2, self.ih3, self.ih4, self.ih5, self.ih6] if x]
 
     def good_inventory_dict(self) -> dict:
         return literal_eval(self.good_inventory)
 
-    def temp_inventory_dict(self) -> dict:
-        return literal_eval(self.temp_inventory)
-
-    """Переносит все вещи из походного в настоящий инвентарь. 
-    Вызывается после успешного возврата с вылазки"""
-    def temp_into_good(self):
-        tmp = self.temp_inventory_dict()
-        gdd = self.good_inventory_dict()
-
-        for x in tmp.keys():
-            if x in gdd.keys():
-                gdd[x] += tmp[x]
-            else:
-                gdd[x] = tmp[x]
-
-        self.good_inventory = str(gdd)
-        self.temp_inventory = '{}'
-
     def set_keyboard(self, k_index, session):
-        self.prev_keyboard = self.keyboard
         self.keyboard = k_index
         session.flush()
 
     # gameEngine type
-    def get_item(self, item_id, session, count=1, inventory='temp'):
-        if inventory == 'temp':
-            inventory = self.temp_inventory_dict()
-        else:
-            inventory = self.good_inventory_dict()
+    def get_item(self, item_id, session, count=1):
+        inventory = self.good_inventory_dict()
 
         if item_id in inventory.keys():
             inventory[item_id] += count
         else:
             inventory[item_id] = count
 
-        if inventory == 'temp':
-            self.temp_inventory = str(inventory)
-        else:
-            self.good_inventory = str(inventory)
-
+        self.good_inventory = str(inventory)
         session.flush()
 
-    def remove_item(self, item_id, session, count=1, inventory='temp'):
-        if inventory == 'temp':
-            inventory = self.temp_inventory_dict()
-        else:
-            inventory = self.good_inventory_dict()
+    def remove_item(self, item_id, session, count=1):
+        inventory = self.good_inventory_dict()
 
         if item_id in inventory.keys() and inventory[item_id] >= count:
             if inventory[item_id] == count:
@@ -102,13 +123,10 @@ class User(SqlAlchemyBase):
             else:
                 inventory[item_id] -= count
 
-            if inventory == 'temp':
-                self.temp_inventory = str(inventory)
-            else:
-                self.good_inventory = str(inventory)
-
+            self.good_inventory = str(inventory)
             session.flush()
             return True
+
         return False
 
     def get_money(self, amount, session):
@@ -131,14 +149,14 @@ class User(SqlAlchemyBase):
         price_with_com = int(price + price * COMMISSION)
         lots = session.query(LotBuy).filter((LotBuy.item_id == item), (LotBuy.price == price_with_com)).all()
 
-        if not self.remove_item(item, session, inventory='good'):
+        if not self.remove_item(item, session):
             return 'У вас нет этого предмета'
 
         if lots:
             for lot in lots:
-                session.delete(lot)
-                session.flush()
                 if item_transfer(self, lot.owner, item, price, session):
+                    session.delete(lot)
+                    session.flush()
                     server.notification(lot.owner.vk_id, f'Куплен предмет {item} за {price}')
                     return f'Предмет продан. +{price} = {self.money} золота'
 
@@ -152,9 +170,9 @@ class User(SqlAlchemyBase):
         lots = session.query(LotSell).filter((LotSell.item_id == item), (LotSell.price == price)).all()
         if lots:
             for lot in lots:
-                session.delete(lot)
-                session.flush()
                 if item_transfer(lot.owner, self, item, price, session):
+                    session.delete(lot)
+                    session.flush()
                     server.notification(lot.owner.vk_id, f'У Вас купили {item} за {price - price * COMMISSION}')
                     k += 1
                 if k == count:
@@ -176,6 +194,6 @@ class User(SqlAlchemyBase):
 def item_transfer(sell: User, buy: User, item, price, session):
     if buy.spend_money(price, session):
         sell.get_money(price - price * COMMISSION, session)
-        buy.get_item(item, session, inventory='good')
+        buy.get_item(item, session)
         return True
     return False

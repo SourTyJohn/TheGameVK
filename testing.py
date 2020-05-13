@@ -24,4 +24,5 @@ def func2(number):
         n += int(number)
 
 
-print(sorted('10 11 12 13 14 15 16 17 18 19 20 21'.split()))
+for lvl in range(9, 29):
+    print(int((lvl - 8) ** 2 * 500))

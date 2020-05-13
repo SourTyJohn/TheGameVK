@@ -1,20 +1,45 @@
 import vk_api
 from data.tokens import *
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+from vk_api.bot_longpoll import VkBotLongPoll
 
 from data import db_session
-db_session.global_init("db/global.db")
-
-from data.db_models._users import User, LotBuy, LotSell
-from data.db_models._items import show_inventory, show_item, init_items, ITEMS
+from data.db_models._users import User, LotBuy, LotSell, MAX_HEROES
+from data.db_models._passiveHeroes import PassiveHero, STATS_NAMES, STATS
+from data.gameEngine.entities.character import RND_NAMES
+from data.db_models._items import *
 import random as rd
 
-ITEMS_PER_PAGE = 10
-
+db_session.global_init("db/global.db")
 
 vk_session = vk_api.VkApi(token=BOT_TOKEN)
 vk = vk_session.get_api()
 longpoll = VkBotLongPoll(vk_session, GROUP_ID)
+
+ITEMS_PER_PAGE = 10
+
+HELP_INVENTORY = 'о (Осмотреть) <номер или id предмета>\n\n' \
+           'п (Продать) <номер или id предмета> <цена>\n\n' \
+           'к (Купить) <номер или id предмета> <цена> [опционально: кол-во запросов]\n\n' \
+           'и (Использовать) <номер или id предмета>'
+
+CHARACTER_HELP = '''Сила : +++Урон в тяжёлым оружием
+Ловкость: +Увороты  +Урон лёгким оружием  ++Урон из луков
+Реакция: +++Увороты. Определяет очерёдность ходов
+Выносливость: +++Выносливость
+Телосложение: +++Здоровье
+Интеллект: ++Эффективность заклинаний
+Удача: ++Качество найденных предметов  +Шанс крит.урона
+Внимательность: +++Шанс найти предмет'''
+# ----
+# у (Улучшить) <id параметра>'''
+# выгнать (Выгнать) <номер героя> Вы навсегда потеряете этого персонажа'''
+
+MARKET_HELP = 'п (Продать) <id предмета> <цена>\n\n' \
+              'к (Купить) <id предмета> <цена> [кол-во] ' \
+              'к (Купить) <номер слота на т.площадке>\n\n' \
+              'н (Найти) <id предмета>'
+
+MY_LOTS_HELP = 'у (Удалить) <id лота (первое число в строке лота)>'
 
 
 # == USER ==
@@ -29,11 +54,122 @@ def checkKeyboard(user):
 
 
 # == DUNGEON ==
-def f_prepare(user, session, text):
+def f_prepare(user: User, session, text):
     user.set_keyboard(3, session)
-    return "Вы отправляетесь в подземелье. " \
-           "Выберите сначала позицию в отряде, а затем какого персонажа туда назначить"
+
+    # TEST
+    for i, hero in enumerate(user.get_heroes_list()):
+        user.activate_hero(hero, i + 1, session)
+    #
+
+    return "Вы отправляетесь в подземелье.\n" \
+           'Выберите позицию в отряде. Оружие стоит подбирать в зависимости от позиции\n' \
+           'Текущий отряд\n' \
+            f'1{user.h1}\n' \
+            f'2{user.h2}\n' \
+            f'3{user.h3}\n'
+
+
+def f_chose_pos(user, session, text):
+    return 'Временно не доступно'
+
+    if len(text) > 1 and text[1].isdigit() and 0 < int(text[1]) < 4:
+        user.selected_slot = int(text[1])
+
+        characters = user.get_heroes_list()
+
+        ch_str = ''
+        for i, x in enumerate(characters):
+            ch_str += f'{i + 1} {str(x)}'
+
+        user.set_keyboard(11, session)
+        return 'Выберите персонажа на эту позицию:\n\n' + ch_str
+    return 'Неверная команда'
+
+
+def f_weapon_select_menu(user, session, text):
+    pass
+
+
+def f_item_select_menu(user, session, text):
+    pass
+
+
+def f_show_weapons(user, session, text):
+    inv = ''
+
+    for x in user.good_inventory_dict().keys():
+        if str(ITEMS[x].__name__)[0] == 'w':
+            inv += show_item(x, session)
+
+    return inv
+
+
+def f_chose_weapon(*args):
+    try:
+        pass
+
+    except Exception:
+        return 'что-то не так'
 # == ==
+
+
+# == CHARACTERS ==
+def f_characters_main(user, session, text):
+    user.set_keyboard(8, session)
+    characters = user.get_heroes_list()
+
+    ch_str = ''
+    for i, x in enumerate(characters):
+        ch_str += f'{i + 1} {str(x)}'
+
+    return f'ПЕРСОНАЖИ {len(user.get_heroes_list())} / {MAX_HEROES}\n\n' + ch_str
+
+
+def f_character(user, session, text):
+    hero = get_id_character(user, text)
+    if hero is not None:
+        user.set_keyboard(9, session)
+        return hero.show()
+    else:
+        return 'У Вас нет такого персонажа'
+
+
+def f_character_delete(user, session, text):
+    return user.del_hero(session)
+
+
+def get_id_character(user, text):
+    if len(text) > 1 and text[1].isdigit() and 1 <= int(text[1]) <= MAX_HEROES:
+        heroes = user.get_heroes_list()
+        k = int(text[1])
+        if k < len(heroes) + 1:
+            user.selected_slot = k - 1
+            return heroes[k - 1]
+
+
+def f_character_help(*args):
+    return CHARACTER_HELP
+
+
+def f_character_upgrade_main(user, session, text):
+    user.set_keyboard(10, session)
+    return 'Выберите параметр по его id.' \
+           'Про параметры Вы можете прочитать нажав Назад, потом Справка'
+
+
+def f_character_upgrade(user, session, text):
+    if len(text) > 1 and text[1] in ['str', 'dex', 'rea', 'stm', 'agl', 'int', 'lck', 'att']:
+        hero: PassiveHero = user.get_heroes_list()[user.selected_slot]
+        if hero.s_free == 0:
+            return 'Не хватает очков параметров'
+        stats = hero.open_stats()
+        stat = text[1]
+        stats[stat] += 1
+        stats['free'] -= 1
+        hero.close_stats(stats)
+        return f'+ 1 {STATS_NAMES[stat]} = {stats[stat]}'
+    return 'Неверная команда'
 
 
 # == ИНВЕНТАРЬ ==
@@ -44,17 +180,36 @@ def f_inventory_main(user, session, text):
 
 
 def f_inventory_help(*args):
-    return 'о <номер или id предмета> (Осмотреть)\n\n' \
-           'п <номер или id предмета> <цена>\n\n' \
-           'к <номер или id предмета> <цена> [опционально: кол-во запросов]'
+    return HELP_INVENTORY
 
 
 def f_show_item_good(user, session, text):
     try:
-        return show_item(get_id_from(text, user, session), session, full=True)
+        iid, tp = get_id_from(text, user, session)
+        return show_item(iid, session)
 
     except Exception:
         return 'что-то пошло не так'
+
+
+def f_use_from_inv(user, session, text):
+
+    try:
+        iid, tp = get_id_from(text, user, session)
+        code = ITEMS[iid].use(user, session)
+
+        if not code:
+            return 'У Вас нету этого предмета'
+
+        if code == 'openB#1':
+            return getRngItem(user, session, LT_BOX, 10)
+        else:
+            return code
+
+    except Exception:
+        return 'Что-то не так'
+
+
 # == ==
 
 
@@ -183,7 +338,7 @@ def get_trades_txt(trades, session):
         if x.item_id not in sells.keys():
             ses = session.query(LotBuy).filter(LotBuy.item_id == x.item_id).all()
             if ses:
-                sells[x.item_id] = max(ses, key=lambda x: x.price).price
+                sells[x.item_id] = max(ses, key=lambda y: y.price).price
             else:
                 sells[x.item_id] = 'нет'
 
@@ -226,23 +381,12 @@ def get_trades_my(user, session, page):
 
 
 def f_market_help(*args):
-    return 'п (продать) <id предмета> <цена>\n\n' \
-           '"к (купить) <id предмета> <цена> [кол-во]" или "к <номер слота на т.площадке>"\n\n' \
-           'с (сортировать по цене) <1, 0, -1> (1 возрастание, -1 убывание, 0 не сортировать)\n\n' \
-           'н (найти) <id предмета>'
+    return MARKET_HELP
 
 
 def f_my_lots_help(*args):
-    return 'у (удалить) <id лота (первое число в строке лота)>'
+    return MY_LOTS_HELP
 # == ==
-
-
-def view_hero(number):
-    pass
-
-
-def select_hero(number):
-    pass
 
 
 # == ОБЩЕЕ ==
@@ -274,15 +418,33 @@ def f_back(user, session, text):
 
 def f_start(vk_id, session, *args):
     user = User(vk_id)
-    session.add(user)
+
+    names = rd.choices(RND_NAMES, k=3)
+    p1 = PassiveHero(names[0], user.vk_id)
+    p2 = PassiveHero(names[1], user.vk_id)
+    p3 = PassiveHero(names[2], user.vk_id)
+
+    session.add_all([user, p1, p2, p3])
     session.flush()
 
-    user.get_item('tab', session, 5, inventory='good')
-    user.get_item('pob', session, 1, inventory='good')
-    return 'Вы успешно зарегестрировались'
+    user.new_hero(session, p1.id)
+    user.new_hero(session, p2.id)
+    user.new_hero(session, p3.id)
+    user.get_item('lub', session, 1)
+
+    print(f'New Player Added. ID: {user.vk_id}')
+    return 'Вы успешно зарегестрировались. В инвентаре стартовый подарок\n' \
+           'Загляните так же в меню персонажей и распределите очки опыта'
 
 
 def f_goto_menu(user, session, *args):
+    if user.h1:
+        user.h1.exit(session)
+    if user.h2:
+        user.h2.exit(session)
+    if user.h3:
+        user.h3.exit(session)
+
     user.set_keyboard(2, session)
     return 'Главное меню'
 # == ==
