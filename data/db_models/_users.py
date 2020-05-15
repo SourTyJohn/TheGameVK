@@ -3,6 +3,7 @@ from data.db_session import SqlAlchemyBase
 from ast import literal_eval
 
 from data.db_models._marketLot import LotSell, LotBuy, COMMISSION, COMMISSION_TEXT
+from data.db_models._activeHeroes import ActiveHero
 
 from core import server
 from sqlalchemy.orm import relation
@@ -43,7 +44,7 @@ class User(SqlAlchemyBase):
 
     """Сражение в котором участвует игрок"""
     battle = sql.Column(sql.Integer, sql.ForeignKey('battles.id'), nullable=True)
-    b = relation("Battle")
+    b = relation("Battle", foreign_keys=[battle], post_update=True)
 
     keyboard = sql.Column(sql.SmallInteger, default=1)
     page = sql.Column(sql.Integer, default=0)
@@ -52,9 +53,19 @@ class User(SqlAlchemyBase):
     selected_slot = sql.Column(sql.Integer, nullable=True)
     selected_slot_2 = sql.Column(sql.Integer, nullable=True)
 
+    battle_won = sql.Column(sql.Integer, default=0)
+
     def __init__(self, vk_id):
         self.vk_id = vk_id
         self.keyboard = 2
+
+    def heroes_exit(self, session):
+        if self.h1:
+            self.h1.exit(session, self)
+        if self.h2:
+            self.h2.exit(session, self)
+        if self.h3:
+            self.h3.exit(session, self)
 
     def new_hero(self, session, hero_id):
         idle_heroes = self.get_heroes_list()
@@ -80,15 +91,23 @@ class User(SqlAlchemyBase):
         pass
 
     def activate_hero(self, hero, slot, session):
-        active = hero.active(session)
+        active = hero.active(session, slot)
+
+        '''Если такой герой уже создан, то существующий удалиться'''
+        exists = session.query(ActiveHero).filter(active.passive_id == ActiveHero.passive_id).first()
+        if exists:
+            exists.exit(session, self)
+
         session.add(active)
         session.commit()
+
         if slot == 1:
             self.hero1 = active.id
         elif slot == 2:
             self.hero2 = active.id
         elif slot == 3:
             self.hero3 = active.id
+
         session.commit()
 
     def get_heroes_list(self) -> list:

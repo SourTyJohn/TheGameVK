@@ -48,6 +48,8 @@ class Item(SqlAlchemyBase):
 def init_items(session):
     session.query(Item).delete()
     session.add_all([
+        Item(w_Fist, []),
+
         Item(i_Bread, [LT_DUNGEON, LT_BOX]),
         Item(i_HolyWater, [LT_DUNGEON, LT_BOX]),
         Item(i_Clover, [LT_DUNGEON, LT_BOX]),
@@ -58,11 +60,11 @@ def init_items(session):
         Item(w_Dagger, [LT_DUNGEON, LT_BOX]),
         Item(w_GreatSword, [LT_DUNGEON, LT_BOX]),
         Item(w_Crossbow, [LT_DUNGEON, LT_BOX]),
+        Item(w_RustySword, [LT_DUNGEON]),
 
         Item(t_BaseTrinket, [LT_DUNGEON, LT_BOX])
     ])
     session.commit()
-    session.close()
 
     print('all items inited')
 
@@ -83,13 +85,11 @@ def show_item(item_id, full=False):
 
 def show_inventory(inventory: dict, inv_filter=None):
     result = ''
-
     for i, x in enumerate(inventory.keys()):
         if inv_filter is not None:
             pass
 
         result += f'{i + 1}. {show_item(x, False)}: {inventory[x]}шт.\n'
-
     return result, len(inventory.keys())
 
 
@@ -97,9 +97,9 @@ def id_to_class(item_id):
     return ITEMS[item_id]
 
 
-def getRngItemInDungeon(user):
-    luck = max((user.h1, user.h2, user.h3), key=lambda x: x.luck()).luck()
-    return getRngItem(user, luck, LT_DUNGEON)
+def getRngItemInDungeon(user, session):
+    luck = max([x for x in [user.h1, user.h2, user.h3] if x], key=lambda x: x.luck()).luck()
+    return getRngItem(user, session, LT_DUNGEON, luck)
 
 
 def lootRarity(luck):

@@ -179,37 +179,63 @@ WEAPON_TAGS = [
 class Weapon(Item):
     item_type = 5
     rarity = 4
+    crit = 0
 
-    damage = 0
+    damage = [0, 0]
     attacks = []
     param_scaling = {}
     perks_scaling = {}
 
     @classmethod  # Подсчитывает урон оружия на основе параметров владельца
     def trueDamage(cls, actor: ActiveCharacter, multiply=1):
-        damage = cls.damage
+        damage = cls.damage[:]
 
         stats = actor.all_stats()
         for s in cls.param_scaling.keys():
-            damage += stats[s] * cls.param_scaling[s]
+            damage[0] += stats[s] * cls.param_scaling[s]
+            damage[1] += stats[s] * cls.param_scaling[s]
 
-        perks = actor.all_perks()
-        for p in cls.perks_scaling.keys():
-            if p in perks:
-                damage *= cls.perks_scaling[p]
-
-        damage *= multiply
-        return damage
+        damage[0] *= multiply
+        damage[1] *= multiply
+        return [int(x) for x in damage], cls.crit + actor.luck()
 
     @classmethod
     def full_id(cls):
         return
 
+    @classmethod
+    def show_attacks(cls, hero):
+        res = ''
+        for i, att in enumerate(cls.attacks):
+            res += f'{i + 1} {att.description(hero, cls)}\n\n'
+        return res, len(cls.attacks)
+
+
+class w_Fist(Weapon):
+    rarity = -1
+    damage = [2, 5]
+    crit = 2
+    id = 'Fist'
+    param_scaling = {'str': 1.5}
+    attacks = [ATTACKS['Punch'], ]
+
+
+class w_RustySword(Weapon):
+    rarity = 1
+    damage = [3, 7]
+    crit = 5
+    description = ['Такое-себе вооружение']
+    id = 'w_rus'
+    name = 'Ржавый меч'
+    attacks = [ATTACKS['BrS'], ATTACKS['CoT']]
+    param_scaling = {'str': 0.5, 'dex': 0.3}
+
 
 class w_Dagger(Weapon):
     damage = [3, 7]
+    crit = 10
     description = ['Небольшой, однако крайне острый клинок', ]
-    id = 'dag'
+    id = 'w_dag'
     name = 'Кинжал'
     attacks = [ATTACKS['DiS'], ]
     param_scaling = {'dex': 0.3, 'rea': 0.1}
@@ -218,8 +244,9 @@ class w_Dagger(Weapon):
 
 class w_GreatSword(Weapon):
     damage = [8, 14]
+    crit = 4
     description = ['Из-за длины и веса тяжек в обращении, но бойцы с большой силой смогут с ним управиться', ]
-    id = 'grs'
+    id = 'w_grs'
     name = 'Двуручный меч'
     attacks = []
     param_scaling = {'dex': 0.1, 'str': 1}
@@ -228,8 +255,9 @@ class w_GreatSword(Weapon):
 
 class w_Crossbow(Weapon):
     damage = [10, 12]
+    crit = 4
     description = ['Арбалет как Арбалет', ]
-    id = 'crs'
+    id = 'w_crs'
     name = 'Арбалет'
     attacks = []
     param_scaling = {'dex': 1.2}
@@ -243,6 +271,6 @@ class Trinket(Item):
 
 
 class t_BaseTrinket(Trinket):
-    id = 'btr'
+    id = 't_btr'
     name = 'Амулет'
     description = ['Амулет со случайными магическими свойствами', ]

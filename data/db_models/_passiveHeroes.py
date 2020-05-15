@@ -38,8 +38,8 @@ class PassiveHero(SqlAlchemyBase, PassiveCharacter):
         self.s_att_base = stats['att']
         self.s_free = stats['free']
 
-    def active(self, session):
-        return ActiveHero(self, session)
+    def active(self, session, pos):
+        return ActiveHero(self, session, pos)
 
     def show(self):
         description = str(self)

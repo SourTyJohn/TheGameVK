@@ -6,12 +6,12 @@ BASIC_HEALTH = 20
 HEALTH_PER_AGL = 2
 BASIC_STAMINA = 100
 STAMINA_PER_STM = 4
+
 STATS = ['str', 'dex', 'rea', 'stm', 'agl', 'int', 'lck', 'att']
 STATS_NAMES = {'str': 'Сила', 'dex': 'Ловкость', 'rea': 'Реакция', 'stm': 'Выносливость',
                'agl': 'Здоровье', 'int': 'Интеллект', 'lck': 'Удача', 'att': 'Внимательность'}
 
-RND_NAMES = ['Люси', 'Гарольд', 'Ричард', 'Абдул Альхазред', 'Чарльз Вард', 'Геральт',
-             "Жанна Л'айт", 'Серёга', 'Гатс', 'Джудо', 'Рихард']
+RND_NAMES = ['Абдул Альхазред', 'Чарльз Вард', 'Геральт', 'Серёга', 'Гатс', 'Джудо', 'Рихард']
 
 
 class PassiveCharacter:
@@ -41,6 +41,9 @@ class PassiveCharacter:
     def all_perks(self):
         return literal_eval(self.s_perks)
 
+    def __repr__(self):
+        return f':: {self.name}. Уровень: {self.lvl}\n'
+
 
 class ActiveCharacter:
     passive_id: int = 0
@@ -60,6 +63,9 @@ class ActiveCharacter:
     health_max = sql.Column(sql.Integer)
     stamina_now = sql.Column(sql.Integer)
     stamina_max = sql.Column(sql.Integer)
+
+    b = 0
+    pos = 0
 
     """Вызывать в __init__  Устанавливает начальное здоровье равное максимуму"""
     def start(self):
@@ -131,3 +137,19 @@ class ActiveCharacter:
 
     def all_perks(self):
         return self.passive.all_perks()
+
+    def get_damage(self, source, amount, session):
+        self.health_now -= amount
+        s = ''
+        if source == 'crit':
+            s = 'КРИТ '
+        if not self.is_alive():
+            self.dead(session)
+            return f'{s} {self.passive.name} был убит'
+        return f'{s} {self.passive.name} получил {amount} урона'
+
+    def is_alive(self):
+        return self.health_now > 0
+
+    def dead(self, session):
+        pass

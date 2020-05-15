@@ -4,10 +4,14 @@ from vk_api.bot_longpoll import VkBotLongPoll
 
 from data import db_session
 from data.db_models._users import User, LotBuy, LotSell, MAX_HEROES
-from data.db_models._passiveHeroes import PassiveHero, STATS_NAMES, STATS
-from data.gameEngine.entities.character import RND_NAMES
+from data.db_models._passiveHeroes import PassiveHero, STATS_NAMES
 from data.db_models._items import *
+from data.db_models._passiveEnemies import *
+from data.db_models._activeBattles import *
+
+from data.gameEngine.entities.character import RND_NAMES
 import random as rd
+
 
 db_session.global_init("db/global.db")
 
@@ -53,29 +57,21 @@ def checkKeyboard(user):
 # == ==
 
 
-# == DUNGEON ==
+# == DUNGEON PREPARE ==
 def f_prepare(user: User, session, text):
     user.set_keyboard(3, session)
 
-    # TEST
-    for i, hero in enumerate(user.get_heroes_list()):
-        user.activate_hero(hero, i + 1, session)
-    #
-
     return "Вы отправляетесь в подземелье.\n" \
            'Выберите позицию в отряде. Оружие стоит подбирать в зависимости от позиции\n' \
-           'Текущий отряд\n' \
-            f'1{user.h1}\n' \
-            f'2{user.h2}\n' \
-            f'3{user.h3}\n'
+           'Текущий отряд\n'\
+           f'1 {user.h1}\n' \
+           f'2 {user.h2}\n' \
+           f'3 {user.h3}\n'
 
 
 def f_chose_pos(user, session, text):
-    return 'Временно не доступно'
-
     if len(text) > 1 and text[1].isdigit() and 0 < int(text[1]) < 4:
         user.selected_slot = int(text[1])
-
         characters = user.get_heroes_list()
 
         ch_str = ''
@@ -85,14 +81,6 @@ def f_chose_pos(user, session, text):
         user.set_keyboard(11, session)
         return 'Выберите персонажа на эту позицию:\n\n' + ch_str
     return 'Неверная команда'
-
-
-def f_weapon_select_menu(user, session, text):
-    pass
-
-
-def f_item_select_menu(user, session, text):
-    pass
 
 
 def f_show_weapons(user, session, text):
@@ -105,23 +93,144 @@ def f_show_weapons(user, session, text):
     return inv
 
 
-def f_chose_weapon(*args):
-    try:
-        pass
+def f_dungeon_character(user: User, session, text):
+    tmp = user.selected_slot
+    hero = get_id_character(user, text)
+    if hero:
+        user.activate_hero(hero, tmp, session)
+        user.selected_slot = tmp
+        user.set_keyboard(12, session)
+        inv = show_inventory(user.good_inventory_dict())[0]
+        return 'Выберите этому персонажу Оружие, Амулет, Расходник\n' \
+               'команда: "в (Выбрать) <id или номер предмета>"\n\n' + inv
+    else:
+        return 'Неверная команда'
 
-    except Exception:
-        return 'что-то не так'
+
+def f_dungeon_chose(user, session, text):
+    iid, tp = get_id_from(text, user, session)
+    slot = user.selected_slot
+    if iid[:2] == 'w_':
+        if slot == 1:
+            return user.h1.give_weapon(user, iid, session)
+        elif slot == 2:
+            return user.h2.give_weapon(user, iid, session)
+        elif slot == 3:
+            return user.h3.give_weapon(user, iid, session)
+
+    elif iid[:2] == 't_':
+        if slot == 1:
+            return user.h1.give_trinket(user, iid, session)
+        elif slot == 2:
+            return user.h2.give_trinket(user, iid, session)
+        elif slot == 3:
+            return user.h3.give_trinket(user, iid, session)
+    else:
+        return '...'
 
 
-def f_dungeon_character(user, session, text):
-    user.selected_slot_2 = user.selected_slot
-    get_id_character(user, text)
-    user.set_keyboard(12, session)
-    return 'Выберите оружие для этого персонажа'
+def f_goto_dungeon(user, session, text):
+    if user.h1 or user.h2 or user.h3:
+        battle = Battle(user, session)
+        notification(user.vk_id, f'Сражение началось. Вражеский отряд {battle.lvl} уровня.')
+        session.add(battle)
+        session.flush()
+        user.battle = battle.id
+        session.commit()
+        return battle.play(session)
+
+    else:
+        return 'Нужно выбрать хоть одного героя'
 
 
-def f_goto_dungeon(*args):
-    pass
+def f_battle(user, session, text):
+    res = user.b.play(session)
+    if res == '#P_WIN':
+        return battle_won(user, session)
+    return res
+
+
+def battle_won(user: User, session):
+    user.set_keyboard(2, session)
+    user.battle_won += 1
+
+    if user.battle_won < 3:
+        session.add([user, PassiveHero(rd.choice(RND_NAMES), user.vk_id)])
+        notification(user.vk_id, 'В Ваше распоряжение прибыл новый герой')
+        session.flush()
+
+    user.battle = None
+    user.b = None
+    session.flush()
+    return f'Победа!\n{getRngItemInDungeon(user, session)}'
+
+
+def f_chose_attacks_menu(user, session, text):
+    hero = session.query(ActiveHero).get(user.selected_slot_2)
+    user.set_keyboard(22, session)
+    if hero.weapon:
+        attacks, ln = ITEMS[hero.weapon].show_attacks(hero)
+        user.selected_slot = ln
+        return attacks
+
+    else:
+        attacks = ATTACKS['Punch'].description(hero, ITEMS['Fist'])
+        user.selected_slot = 1
+        return attacks
+
+
+def f_battle_main(user, session, text):
+    user.set_keyboard(21, session)
+    return '...'
+
+
+def f_chose_attack(user, session, text):
+    if len(text) > 1 and text[1].isdigit():
+        if int(text[1]) <= int(user.selected_slot):
+            hero = session.query(ActiveHero).get(user.selected_slot_2)
+            if hero.get_attacks()[0][int(text[1]) - 1].may_choose(hero.pos):
+                user.selected_slot = int(text[1])
+                user.set_keyboard(23, session)
+                return 'Выберите цель для атаки'
+            else:
+                return 'Вы не можете выбрать этот навык на этой позиции'
+        else:
+            return 'У Вас не так много атак'
+    else:
+        return 'Неверная команда'
+
+
+def f_attack(user, session, text):
+    # slot_1 - attack number, slot_2 - hero_id, text[1] - target_pos
+    if len(text) > 1 and text[1].isdigit() and 0 < int(text[1]) < 4:
+        hero = session.query(ActiveHero).get(user.selected_slot_2)
+        attack = hero.get_attacks()[0][user.selected_slot - 1]
+        target_pos = int(text[1])
+        if attack.may_do(target_pos):
+
+            weapon = w_Fist
+            if hero.weapon:
+                weapon = ITEMS[hero.weapon]
+
+            teams = [[user.h1, user.h2, user.h3], [user.b.e1, user.b.e2, user.b.e3]]
+            result =  attack.do(hero, weapon, *teams, target_pos - 1, session)
+
+            if result:
+                user.b.next_turn()
+                user.set_keyboard(24, session)
+                return result
+
+            return f'Тут нет врага'
+        else:
+            return f'Этой способностью нельзя бить по позиции {target_pos}'
+    else:
+        return 'Неверная команда'
+
+
+def f_skip_turn(user, session, text):
+    battle = user.b
+    battle.next_turn()
+    return battle.play(session)
 
 # == ==
 
@@ -431,18 +540,14 @@ def f_back(user, session, text):
 def f_start(vk_id, session, *args):
     user = User(vk_id)
 
-    names = rd.choices(RND_NAMES, k=3)
-    p1 = PassiveHero(names[0], user.vk_id)
-    p2 = PassiveHero(names[1], user.vk_id)
-    p3 = PassiveHero(names[2], user.vk_id)
+    p1 = PassiveHero(rd.choice(RND_NAMES), user.vk_id)
 
-    session.add_all([user, p1, p2, p3])
+    session.add_all([user, p1])
     session.flush()
 
     user.new_hero(session, p1.id)
-    user.new_hero(session, p2.id)
-    user.new_hero(session, p3.id)
-    user.get_item('lub', session, 1)
+    user.get_item(i_LuckyBox.id, session)
+    user.get_item(w_RustySword.id, session)
 
     print(f'New Player Added. ID: {user.vk_id}')
     return 'Вы успешно зарегестрировались. В инвентаре стартовый подарок\n' \
@@ -450,13 +555,7 @@ def f_start(vk_id, session, *args):
 
 
 def f_goto_menu(user, session, *args):
-    if user.h1:
-        user.h1.exit(session)
-    if user.h2:
-        user.h2.exit(session)
-    if user.h3:
-        user.h3.exit(session)
-
+    user.heroes_exit(session)
     user.set_keyboard(2, session)
     return 'Главное меню'
 # == ==

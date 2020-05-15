@@ -61,7 +61,7 @@ class k_PreDungeon(Keyboard):
     """Меню выбора героев для похода"""
     board = create_keyboard([['. 1', 1, 0], ['. 2', 1, 0], ['. 3', 1, 0],
                              ['Отправиться', 2, 1], ['Отменить', 3, 0]])
-    commands = {'отменить': sv.f_goto_menu, '.': sv.f_chose_pos, 'отправиться': ''}
+    commands = {'отменить': sv.f_goto_menu, '.': sv.f_chose_pos, 'отправиться': sv.f_goto_dungeon}
 
 
 class k_Inventory(Keyboard):
@@ -114,11 +114,12 @@ class k_CharacterMenu(Keyboard):
 
 
 class k_WeaponSelect(Keyboard):
-    pass
+    board = create_keyboard([['Готово', 2, 0], ])
+    commands = {'готово': sv.f_prepare, 'в': sv.f_dungeon_chose}
 
 
 class k_PreDungeonCharactersSelect(k_CharacterMenu):
-    commands = {'.': sv.f_dungeon_character}
+    commands = {'.': sv.f_dungeon_character, 'меню': sv.f_goto_menu}
 
 
 class k_Character(Keyboard):
@@ -136,19 +137,47 @@ class k_UpgradeCharacter(Keyboard):
     commands = {'назад': sv.f_characters_main, '+': sv.f_character_upgrade}
 
 
+class k_BattleMain(Keyboard):
+    board = create_keyboard([['Атаковать', 3, 0], ['Предмет', 2, 1], ['Пропустить ход', 0, 1]])
+    commands = {'атаковать': sv.f_chose_attacks_menu, 'пропустить': sv.f_skip_turn}
+
+
+class k_Skill_Select(Keyboard):
+    board = create_keyboard([['. 1', 1, 0], ['. 2', 1, 0], ['. 3', 1, 0],
+                             ['. 4', 1, 1], ['. 5', 1, 0], ['. 6', 1, 0],
+                             BUTTON_BACK])
+    commands = {'назад': sv.f_battle_main, '.': sv.f_chose_attack}
+
+
+class k_EnemyToAttack(Keyboard):
+    board = create_keyboard([['. 1', 1, 0], ['. 2', 1, 0], ['. 3', 1, 0], BUTTON_BACK])
+    commands = {'назад': sv.f_battle_main, '.': sv.f_attack}
+
+
+class k_NextTurn(Keyboard):
+    board = create_keyboard([['-->', 3, 0], ])
+    commands = {'-->': sv.f_battle}
+
+
 KEYBOARDS = {
     2: k_MainMenu,
+
+    4: k_Inventory,
+
     3: k_PreDungeon,
+    11: k_PreDungeonCharactersSelect,
+    12: k_WeaponSelect,
 
     8: k_CharacterMenu,
     9: k_Character,
     10: k_UpgradeCharacter,
-    11: k_PreDungeonCharactersSelect,
-    12: k_WeaponSelect,
-
-    4: k_Inventory,
 
     5: k_Marketplace,
     6: k_MyLots,
-    7: k_MarketplaceSearch
+    7: k_MarketplaceSearch,
+
+    21: k_BattleMain,
+    22: k_Skill_Select,
+    23: k_EnemyToAttack,
+    24: k_NextTurn,
 }

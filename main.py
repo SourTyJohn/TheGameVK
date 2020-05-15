@@ -14,7 +14,13 @@ def auth_handler():
 
 
 def main():
-    server.init_items(create_session())
+    #  Заполнение таблиц-констант
+    session = create_session()
+    session.expire_on_commit = False
+    server.init_items(session)
+    server.init_enemies(session)
+    session.close()
+
     print('running...')
 
     for event in server.longpoll.listen():
@@ -36,6 +42,7 @@ def event_do(event, vk):
                 if text[0] in KEYBOARDS[keyboard].commands.keys():
                     msg = KEYBOARDS[keyboard].commands[text[0]](user, session, text)
                     btn = server.checkKeyboard(user)
+                    # print('MSG:', msg)
                     send_message(user_id, vk, msg, btn)
 
         else:
